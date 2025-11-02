@@ -58,19 +58,25 @@ def transcribe(req: TranscribeReq):
     t0 = time.time()
     with tempfile.TemporaryDirectory() as td:
         base = os.path.join(td, str(uuid.uuid4()))
+
+        # --- Config yt-dlp / UA / cookies / proxy ---
         url = normalize_yt_url(req.url)
 
-        # --- opciones yt-dlp / UA / cookies / proxy ---
-        UA_WEB = os.getenv(
-            "YDL_UA_WEB",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-        )
         UA_IOS = os.getenv(
             "YDL_UA_IOS",
             "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
         )
-        COOKIES = os.getenv("YDL_COOKIES")   # p.ej. /app/cookies.txt (formato Netscape)
-        PROXY = os.getenv("YDL_PROXY")       # p.ej. http://user:pass@host:puerto
+        UA_SAFARI = os.getenv(
+            "YDL_UA_SAFARI",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15"
+        )
+        UA_TV = os.getenv(
+            "YDL_UA_TV",
+            "Mozilla/5.0 (SMART-TV; Linux; Tizen 3.0) AppleWebKit/538.1 (KHTML, like Gecko) Safari/538.1"
+        )
+
+        COOKIES = os.getenv("YDL_COOKIES")   # /app/cookies.txt (Netscape)
+        PROXY = os.getenv("YDL_PROXY")
 
         use_cookies = bool(COOKIES and os.path.exists(COOKIES))
 
@@ -86,26 +92,35 @@ def transcribe(req: TranscribeReq):
             "--retries", "10",
             "-o", f"{base}.%(ext)s",
         ]
-
-        if use_cookies:
-            # Cookies del navegador => usar cliente WEB de escritorio
-            ytdlp_cmd = common + [
-                "--user-agent", UA_WEB,
-                "--extractor-args", "youtube:player_client=web",
-                "--cookies", COOKIES,
-                url,
-            ]
-        else:
-            # Sin cookies => usar cliente iOS (evita PO Token de Android)
-            ytdlp_cmd = common + [
-                "--user-agent", UA_IOS,
-                "--extractor-args", "youtube:player_client=ios",
-                url,
-            ]
-
         if PROXY:
-            ytdlp_cmd += ["--proxy", PROXY]
-        # ------------------------------------------------
+            common += ["--proxy", PROXY]
+        if use_cookies:
+            common += ["--cookies", COOKIES]
+
+        # Intentos en orden para evitar po_token
+        tries = [
+            ("ios", UA_IOS),
+            ("web_safari", UA_SAFARI),
+            ("tv", UA_TV),
+        ]
+
+        last_err = None
+        for client, ua in tries:
+            ytdlp_cmd = common + [
+                "--user-agent", ua,
+                "--extractor-args", f"youtube:player_client={client}",
+                url,
+            ]
+            try:
+                subprocess.run(ytdlp_cmd, check=True, capture_output=True)
+                last_err = None
+                break
+            except subprocess.CalledProcessError as e:
+                last_err = e.stderr.decode(errors="ignore")
+
+        if last_err:
+            raise HTTPException(status_code=400, detail=f"yt-dlp error: {last_err[:500]}")
+
 
         try:
             subprocess.run(ytdlp_cmd, check=True, capture_output=True)
