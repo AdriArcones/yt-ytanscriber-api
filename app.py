@@ -40,7 +40,9 @@ def transcribe(req: TranscribeReq):
     with tempfile.TemporaryDirectory() as td:
         # Salida de yt-dlp: OJO, -o espera una plantilla; usamos path base sin extensión
         base = os.path.join(td, str(uuid.uuid4()))
-        UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+        UA = os.getenv("YDL_UA", "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1")
+        COOKIES = os.getenv("YDL_COOKIES")  # p.ej. /app/cookies.txt
+        PROXY = os.getenv("YDL_PROXY")      # p.ej. http://user:pass@host:puerto
 
         ytdlp_cmd = [
             "yt-dlp",
@@ -50,13 +52,21 @@ def transcribe(req: TranscribeReq):
             "--audio-quality", "0",
             "--no-playlist",
             "--user-agent", UA,
-            "--extractor-args", "youtube:player_client=ios",
+            "--extractor-args", "youtube:player_client=ios",  # evita PO Token de Android
             "--force-ipv4",
-            "--retry-sleep", "1",
+            "--retry-sleep", "2",
             "--retries", "10",
             "-o", f"{base}.%(ext)s",
             req.url,
         ]
+
+        if COOKIES and os.path.exists(COOKIES):
+            ytdlp_cmd += ["--cookies", COOKIES]
+
+        if PROXY:
+            ytdlp_cmd += ["--proxy", PROXY]
+
+            
         try:
             r = subprocess.run(ytdlp_cmd, check=True, capture_output=True)
         except subprocess.CalledProcessError as e:
