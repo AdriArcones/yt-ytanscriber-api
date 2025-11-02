@@ -40,7 +40,8 @@ def transcribe(req: TranscribeReq):
     with tempfile.TemporaryDirectory() as td:
         # Salida de yt-dlp: OJO, -o espera una plantilla; usamos path base sin extensión
         base = os.path.join(td, str(uuid.uuid4()))
-        UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
+        UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+
         ytdlp_cmd = [
             "yt-dlp",
             "-f", "bestaudio/best",
@@ -49,7 +50,7 @@ def transcribe(req: TranscribeReq):
             "--audio-quality", "0",
             "--no-playlist",
             "--user-agent", UA,
-            "--extractor-args", "youtube:player_client=android",
+            "--extractor-args", "youtube:player_client=ios",
             "--force-ipv4",
             "--retry-sleep", "1",
             "--retries", "10",
