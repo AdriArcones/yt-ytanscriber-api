@@ -40,12 +40,19 @@ def transcribe(req: TranscribeReq):
     with tempfile.TemporaryDirectory() as td:
         # Salida de yt-dlp: OJO, -o espera una plantilla; usamos path base sin extensión
         base = os.path.join(td, str(uuid.uuid4()))
+        UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
         ytdlp_cmd = [
             "yt-dlp",
             "-f", "bestaudio/best",
             "--extract-audio",
             "--audio-format", "m4a",
             "--audio-quality", "0",
+            "--no-playlist",
+            "--user-agent", UA,
+            "--extractor-args", "youtube:player_client=android",
+            "--force-ipv4",
+            "--retry-sleep", "1",
+            "--retries", "10",
             "-o", f"{base}.%(ext)s",
             req.url,
         ]
